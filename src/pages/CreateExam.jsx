@@ -8,7 +8,6 @@ export default function CreateExam() {
   const [step, setStep] = useState(1);
   const [examId, setExamId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
   // MCQ creation mode (Manual / AI placeholder)
   const [mode, setMode] = useState("MANUAL");
@@ -109,12 +108,6 @@ alert("Failed to add question");
 
   return (
     <div style={{ padding: 40, maxWidth: 700, margin: "auto" }}>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translate(-50%, -60%); }
-          to { opacity: 1; transform: translate(-50%, -50%); }
-        }
-      `}</style>
       <h2>Create Exam</h2>
       <p>Step {step} of 2</p>
 
@@ -310,53 +303,108 @@ alert("Failed to add question");
             </>
           )}
 
+          {questions.length > 0 && (
+            <div style={{ marginTop: 30 }}>
+              <h3>Questions Preview</h3>
+
+              {questions.map((q, qIndex) => (
+                <div
+                  key={qIndex}
+                  style={{
+                    border: "1px solid #ccc",
+                    padding: 15,
+                    marginBottom: 20,
+                    borderRadius: 6
+                  }}
+                >
+                  {/* Question Text */}
+                  <textarea
+                    value={q.questionText}
+                    onChange={(e) => {
+                      const updated = [...questions];
+                      updated[qIndex].questionText = e.target.value;
+                      setQuestions(updated);
+                    }}
+                  />
+
+                  {/* Options */}
+                  {q.options.map((opt, optIndex) => (
+                    <div key={optIndex} style={{ marginTop: 5 }}>
+                      <input
+                        value={opt}
+                        onChange={(e) => {
+                          const updated = [...questions];
+                          updated[qIndex].options[optIndex] = e.target.value;
+                          setQuestions(updated);
+                        }}
+                      />
+
+                      <input
+                        type="radio"
+                        name={`correct-${qIndex}`}
+                        checked={q.correctAnswer === opt}
+                        onChange={() => {
+                          const updated = [...questions];
+                          updated[qIndex].correctAnswer = opt;
+                          setQuestions(updated);
+                        }}
+                        style={{ marginLeft: 10 }}
+                      />
+                      Correct
+                    </div>
+                  ))}
+
+                  <p style={{ fontSize: 12, color: "#666" }}>
+                    Source: {q.source || "MANUAL"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <p style={{ marginTop: 10 }}>
             Total Questions Added: <b>{questions.length}</b>
           </p>
 
           {/* PUBLISH — ENFORCE MINIMUM 1 QUESTION */}
-          <button
-            style={{ marginTop: 10 }}
-            disabled={questions.length < 1}
-            onClick={async () => {
-              try {
-                await api.patch(`/faculty/exams/${examId}/publish`);
-                setShowSuccess(true);
-                setTimeout(() => navigate("/faculty"), 2000);
-              } catch (err) {
-                console.error(err.response?.data || err);
-                alert("Failed to publish exam");
-              }
-            }}
-          >
-            Publish Exam
-          </button>
+          {questions.length > 0 && (
+            <><button
+              style={{ marginTop: 20 }}
+              onClick={async () => {
+                try {
+                  await api.patch(
+                    `/faculty/exams/${examId}/questions/update`,
+                    { questions }
+                  );
+                  alert("Questions saved successfully");
+                } catch (err) {
+                  console.error(err.response?.data || err);
+                  alert("Failed to save questions");
+                }
+              } }
+            >
+              Save Questions
+            </button><button
+              style={{ marginTop: 30 }}
+              onClick={async () => {
+                try {
+                  await api.patch(`/faculty/exams/${examId}/publish`);
+                  navigate("/faculty");
+                } catch (err) {
+                  alert("Failed to publish exam");
+                }
+              } }
+            >
+                Publish Exam
+              </button></>
+          )}
 
-          {questions.length < 1 && (
-            <p style={{ color: "red", marginTop: 6 }}>
-              Add at least one question to publish.
+          {questions.length === 0 && (
+            <p style={{ color: "red" }}>
+              Add at least one question to publish
             </p>
           )}
         </>
-      )}
-
-      {showSuccess && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'green',
-            color: 'white',
-            padding: '20px',
-            borderRadius: '10px',
-            animation: 'fadeIn 0.5s ease-in',
-            zIndex: 1000
-          }}
-        >
-          Exam Published Successfully!
-        </div>
       )}
     </div>
   );
