@@ -1,55 +1,82 @@
 import { useEffect, useState } from "react";
-import api from "../api/api";
+import { useNavigate } from "react-router-dom";
+import api from "../api/api.js";
 
 export default function CompletedExams() {
-  const [exams, setExams] = useState([]);
+const navigate = useNavigate();
 
-  useEffect(() => {
-    api.get("/faculty/completed-exams")
-      .then(res => setExams(res.data))
-      .catch(() => alert("Failed to load completed exams"));
-  }, []);
+// ✅ IMPORTANT: initialize as ARRAY
+const [exams, setExams] = useState([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
 
-  return (
-    <div style={{ padding: 40 }}>
-      <h2>Completed Exams</h2>
+useEffect(() => {
+const loadCompletedExams = async () => {
+try {
+const res = await api.get("/faculty/exams/completed");
 
-      {exams.length === 0 && <p>No completed exams</p>}
+    // Safety check
+    if (Array.isArray(res.data)) {
+      setExams(res.data);
+    } else {
+      setExams([]);
+    }
+  } catch (err) {
+    console.error(err);
+    setError("Failed to load completed exams");
+    setExams([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-      {exams.map((exam) => (
-        <div key={exam.examId} style={{ marginBottom: 30 }}>
-          <h3>{exam.title}</h3>
+loadCompletedExams();
+}, []);
 
-          {exam.attempts.length === 0 ? (
-            <p>No attempts</p>
-          ) : (
-            <table border="1" cellPadding="10" cellSpacing="0">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Roll No</th>
-                  <th>Score</th>
-                  <th>Time Taken</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {exam.attempts.map((a, idx) => (
-                  <tr key={idx}>
-                    <td>{a.studentName}</td>
-                    <td>{a.rollNo}</td>
-                    <td>{a.score}</td>
-                    <td>{a.durationTaken}</td>
-                    <td>
-                      {a.status === "AUTO_SUBMITTED" ? "🚩 Cheated" : "Normal"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+return (
+<div style={{ padding: 30 }}>
+<h2>Completed Exams</h2>
+
+  {/* Loading */}
+  {loading && <p>Loading completed exams...</p>}
+
+  {/* Error */}
+  {!loading && error && <p style={{ color: "red" }}>{error}</p>}
+
+  {/* Empty state */}
+  {!loading && exams.length === 0 && !error && (
+    <p>No completed exams found</p>
+  )}
+
+  {/* Exams List */}
+  {!loading &&
+    exams.map((exam) => (
+      <div
+        key={exam._id}
+        style={{
+          border: "1px solid #ccc",
+          padding: 15,
+          marginBottom: 15,
+          borderRadius: 6,
+          cursor: "pointer"
+        }}
+        onClick={() =>
+          navigate(`/faculty/completed/${exam._id}`)
+        }
+      >
+        <h3>{exam.title}</h3>
+        <p>
+          {exam.year} – {exam.branch} – {exam.section}
+        </p>
+        <p>Duration: {exam.duration} mins</p>
+        <p>
+          Ended At:{" "}
+          {exam.endTime
+            ? new Date(exam.endTime).toLocaleString()
+            : "N/A"}
+        </p>
+      </div>
+    ))}
+</div>
+);
 }

@@ -40,3 +40,47 @@
 .read-the-docs {
   color: #888;
 }
+
+.student-card {
+background: #1f1f1f;
+padding: 16px;
+border-radius: 10px;
+margin-bottom: 12px;
+}
+
+.student-summary {
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+.student-details {
+margin-top: 12px;
+padding-top: 10px;
+border-top: 1px solid #333;
+}
+
+.risk.highrisk {
+background: #ff4d4d;
+padding: 4px 10px;
+border-radius: 12px;
+}
+
+.risk.average {
+background: #f0ad4e;
+padding: 4px 10px;
+border-radius: 12px;
+}
+
+.risk.perfect {
+background: #5cb85c;
+padding: 4px 10px;
+border-radius: 12px;
+}
+
+.card {
+background: #1f1f1f;
+padding: 20px;
+border-radius: 12px;
+margin-top: 20px;
+}

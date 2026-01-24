@@ -22,6 +22,10 @@ export default function FacultyDashboard() {
       <button onClick={() => navigate("/faculty/create-exam")}>
         ➕ Create Exam
       </button>
+
+      <button onClick={() => navigate("/faculty/faculty-student-analysis")}>
+        📊 Student Analysis
+      </button>
     </div>
   );
 }

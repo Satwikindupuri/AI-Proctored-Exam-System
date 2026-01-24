@@ -2,50 +2,75 @@ import { useEffect, useState } from "react";
 import api from "../api/api";
 
 export default function FlaggedStudents() {
-  const [data, setData] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/faculty/flagged-students")
-      .then(res => setData(res.data))
-      .catch(() => alert("Failed to load flagged students"));
+    const loadFlagged = async () => {
+      try {
+        const res = await api.get("/faculty/flagged");
+        setStudents(res.data);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to load flagged students");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFlagged();
   }, []);
 
+  if (loading) return <p>Loading flagged students...</p>;
+
+  if (students.length === 0)
+    return <p>No flagged students found.</p>;
+
   return (
-    <div style={{ padding: 40 }}>
+    <div style={{ padding: "30px" }}>
       <h2>🚩 Flagged Students</h2>
 
-      {data.length === 0 ? (
-        <p>No flagged students</p>
-      ) : (
-        <table border="1" cellPadding="10" cellSpacing="0">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Roll No</th>
-              <th>Class</th>
-              <th>Exam</th>
-              {/* <th>Violations</th> */}
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, idx) => (
-              <tr key={idx}>
-                <td>{row.studentName}</td>
-                <td>{row.rollNo}</td>
-                <td>{row.class}</td>
-                <td>{row.examTitle}</td>
-                {/* <td style={{ color: "red", fontWeight: "bold" }}>
-                  {row.violationsCount}
-                </td> */}
-                <td>
-                  {row.submissionType === "AUTO_SUBMITTED" ? "🚩 Auto" : "Manual"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {students.map((s, idx) => (
+        <div key={idx} style={cardStyle}>
+          <div style={colStyle}>
+            {s.submissionType === "AUTO_SUBMITTED" ? "🚩" : "Manual"}
+          </div>
+
+          <div style={colStyle}><b>{s.name}</b></div>
+          <div style={colStyle}>{s.rollNo}</div>
+          <div style={colStyle}>{s.class}</div>
+          <div style={colStyle}>{s.examTitle}</div>
+
+          {/* <div style={colStyle}>
+            <span style={badgeStyle}>
+              {s.violationsCount} Violations
+            </span>
+          </div> */}
+
+        </div>
+      ))}
     </div>
   );
 }
+
+const cardStyle = {
+  display: "grid",
+  gridTemplateColumns: "2fr 1.5fr 1.5fr 2fr ",
+  padding: "15px",
+  marginBottom: "12px",
+  background: "#1e1e1e",
+  borderRadius: "10px",
+  alignItems: "center",
+  color: "white",
+};
+
+const colStyle = {
+  padding: "0 10px",
+};
+
+const badgeStyle = {
+  background: "#ff4d4f",
+  padding: "5px 10px",
+  borderRadius: "12px",
+  fontSize: "12px",
+};
