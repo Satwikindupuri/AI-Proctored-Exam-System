@@ -1,23 +1,46 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/api";
-
+import { initFaceDetector, detectFaces } from "../ai/faceProctor";
 // --- REUSEABLE CAMERA COMPONENT ---
-const CameraPreview = ({ stream, muted = true, style = {} }) => {
-  const videoRef = useRef(null);
+// const CameraPreview = ({ stream, muted = true, style = {} }) => {
+//   const videoRef = useRef(null); // Commented: internal ref no longer used
+//   useEffect(() => {
+//     if (videoRef.current && stream) videoRef.current.srcObject = stream;
+//   }, [stream]);
+
+//   return (
+//     <video
+//       ref={videoRef}
+//       autoPlay
+//       muted={muted}
+//       playsInline
+//       style={{
+//         width: "100%", borderRadius: "8px", transform: "scaleX(-1)",
+//         backgroundColor: "#000", ...style
+//       }}
+//     />
+//   );
+// };
+
+const CameraPreview = ({ stream, videoRef }) => {
   useEffect(() => {
-    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
   }, [stream]);
 
   return (
     <video
       ref={videoRef}
       autoPlay
-      muted={muted}
+      muted
       playsInline
       style={{
-        width: "100%", borderRadius: "8px", transform: "scaleX(-1)",
-        backgroundColor: "#000", ...style
+        width: "100%",
+        borderRadius: "8px",
+        transform: "scaleX(-1)",
+        backgroundColor: "#000"
       }}
     />
   );
@@ -46,6 +69,53 @@ export default function ExamView() {
   const MAX_VIOLATIONS = 3;
   const proctoringPaused = useRef(true);
   const cooldown = useRef(false);
+  const faceDetectorRef = useRef(null); 
+  const noFaceStartRef = useRef(null);
+  const webcamVideoRef = useRef(null);
+  const aiIntervalRef = useRef(null);
+
+  const resetAIState = () => {
+    console.log("RESETTING AI STATE");
+
+    noFaceStartRef.current = null;
+    proctoringPaused.current = false;
+  };
+
+  const startAIProctoring = async () => {
+    console.log("AI PROCTORING ENABLED");
+
+    // 🔥 HARD RESET
+    resetAIState();
+
+    if (aiIntervalRef.current) {
+      clearInterval(aiIntervalRef.current);
+    }
+
+    aiIntervalRef.current = setInterval(async () => {
+      if (proctoringPaused.current) return;
+
+      const faces = await detectFaces(webcamVideoRef.current);
+      console.log("AI FACE COUNT:", faces.length);
+
+      if (faces.length === 0) {
+        if (!noFaceStartRef.current) {
+          noFaceStartRef.current = Date.now();
+        }
+
+        const noFaceSeconds =
+          (Date.now() - noFaceStartRef.current) / 1000;
+
+        console.log("NO FACE SECONDS:", noFaceSeconds);
+
+        if (noFaceSeconds >= 5) {
+          handleViolation("NO_FACE_DETECTED");
+        }
+      } else {
+        // 🔥 IMPORTANT RESET WHEN FACE RETURNS
+        noFaceStartRef.current = null;
+      }
+    }, 1000);
+  };
 
   useEffect(() => {
     api.get(`/student/exams/${examId}`).then((res) => setExam(res.data));
@@ -69,6 +139,9 @@ export default function ExamView() {
         if (element.requestFullscreen) await element.requestFullscreen();
       }
       
+      await initFaceDetector();
+      faceDetectorRef.current = true;
+      
       if (!started) {
         await api.post(`/student/exams/${examId}/start`);
         setStarted(true);
@@ -77,10 +150,20 @@ export default function ExamView() {
       setShowModal(false);
       setIsLocked(false); // Unlock content
       
-      setTimeout(() => { proctoringPaused.current = false; }, 1200);
+      setTimeout(() => {
+        startAIProctoring();
+      }, 1500);
     } catch (err) {
       alert("Fullscreen is mandatory to block sidebars/extensions.");
     }
+  };
+
+  const resumeExam = () => {
+    setShowModal(false);
+
+    setTimeout(() => {
+      startAIProctoring(); // 🔥 fresh start
+    }, 800);
   };
 
   // ---------------- MODIFIED VIOLATION LOGIC ----------------
@@ -90,12 +173,26 @@ export default function ExamView() {
     cooldown.current = true;
     setViolations((prev) => {
       const newCount = prev + 1;
-      api.post(`/student/exams/${examId}/violation`, { reason, count: newCount });
+      try {
+        api.post(`/student/exams/${examId}/violation`, {
+          reason,
+          count: newCount
+        });
+      } catch (err) {
+        console.error("Violation API failed (ignored):", err.message);
+      }
 
       if (newCount >= MAX_VIOLATIONS) {
         submitExam(true);
       } else {
         proctoringPaused.current = true;
+
+        if (aiIntervalRef.current) {
+          clearInterval(aiIntervalRef.current);
+          aiIntervalRef.current = null;
+        }
+
+        noFaceStartRef.current = null; // 🔥 force reset
         setModalType("VIOLATION");
         setShowModal(true);
       }
@@ -105,7 +202,8 @@ export default function ExamView() {
     setTimeout(() => { cooldown.current = false; }, 2000);
   }, [examId, finished, submitting]);
 
-  // ---------------- NEW: EXTENSION/MUTATION DETECTION ----------------
+
+
   useEffect(() => {
     if (!started || finished) return;
 
@@ -270,7 +368,7 @@ export default function ExamView() {
           <div style={modalBoxStyle}>
             {cameraStream && (
               <div style={{ marginBottom: "20px", width: "240px", margin: "0 auto 20px" }}>
-                <CameraPreview stream={cameraStream} />
+                <CameraPreview stream={cameraStream} videoRef={webcamVideoRef} />
               </div>
             )}
 
@@ -294,7 +392,7 @@ export default function ExamView() {
               <>
                 <h2 style={{ color: "red" }}>Violation Detected!</h2>
                 <p style={{color: '#333', fontWeight: 'bold'}}>Violations: {violations} / {MAX_VIOLATIONS}</p>
-                <button style={btnStyle} onClick={enterFullscreenAndStart}>Return to Exam</button>
+                <button style={btnStyle} onClick={resumeExam}>Return to Exam</button>
               </>
             )}
           </div>
@@ -342,7 +440,7 @@ export default function ExamView() {
 
           <div style={{ width: "280px" }}>
             <div style={webcamContainerStyle}>
-              <CameraPreview stream={cameraStream} />
+              <CameraPreview stream={cameraStream} videoRef={webcamVideoRef} />
               <div style={{ textAlign: "center", fontSize: "12px", marginTop: "8px" }}>Live Feed Active</div>
             </div>
           </div>
