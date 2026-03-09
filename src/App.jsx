@@ -13,6 +13,9 @@ import FacultyLiveExams from "./pages/FacultyLiveExams";
 import CompletedExamDetails from "./pages/CompletedExamsDetails";
 import FacultyStudentAnalysis from "./pages/FacultyStudentAnalysis";
 import StudentAnalysisDetails from "./pages/StudentAnalysisDetails";
+import CreateCodingExam from "./pages/CreateCodingExam";
+import AddCodingQuestions from "./pages/AddCodingQuestions";
+import CodingExamView from "./pages/CodingExamView";
 
 function App() {
   return (
@@ -24,6 +27,7 @@ function App() {
         {/* Student */}
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/exam/:examId" element={<ExamView />} />
+        <Route path="/coding-exam/:examId" element={<CodingExamView />} />
 
         {/* Faculty */}
         <Route path="/faculty" element={<FacultyDashboard />} />
@@ -43,6 +47,15 @@ function App() {
           path="/faculty/student-analysis/:studentId"
           element={<StudentAnalysisDetails />}
         />
+        <Route
+          path="/faculty/create-coding-exam"
+          element={<CreateCodingExam />}
+        />
+        <Route
+          path="/faculty/coding-exam/:examId/add-questions"
+          element={<AddCodingQuestions/>}
+        />
+        
       </Routes>
     </BrowserRouter>
   );

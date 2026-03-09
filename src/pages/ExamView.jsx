@@ -37,6 +37,7 @@ export default function ExamView() {
   const [finished, setFinished] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(null);
 
   // PROCTORING STATES
   const [violations, setViolations] = useState(0);
@@ -57,6 +58,9 @@ export default function ExamView() {
   const webcamVideoRef = useRef(null); 
   const modalVideoRef = useRef(null);
   const aiIntervalRef = useRef(null);
+  const examTimerRef = useRef(null);
+  const hasSubmittedOnTimeUpRef = useRef(false);
+  const submitExamRef = useRef(null);
 
   const resetAIState = () => {
     console.log("RESETTING AI STATE");
@@ -107,6 +111,14 @@ export default function ExamView() {
   useEffect(() => {
     api.get(`/student/exams/${examId}`).then((res) => setExam(res.data));
   }, [examId]);
+
+  useEffect(() => {
+    if (!started || finished || !exam?.duration) return;
+    if (timeLeft !== null) return;
+
+    const durationInSeconds = Number(exam.duration) * 60;
+    setTimeLeft(Number.isFinite(durationInSeconds) ? durationInSeconds : 0);
+  }, [started, finished, exam, timeLeft]);
 
   const requestCamera = async () => {
     try {
@@ -291,6 +303,54 @@ export default function ExamView() {
     }
   }, [answers, examId, finished, navigate, submitting, cameraStream]);
 
+  useEffect(() => {
+    submitExamRef.current = submitExam;
+  }, [submitExam]);
+
+  useEffect(() => {
+    if (!started || finished || timeLeft === null) return;
+
+    if (examTimerRef.current) {
+      clearInterval(examTimerRef.current);
+    }
+
+    examTimerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null) return prev;
+
+        if (prev <= 1) {
+          if (examTimerRef.current) {
+            clearInterval(examTimerRef.current);
+            examTimerRef.current = null;
+          }
+
+          if (!hasSubmittedOnTimeUpRef.current) {
+            hasSubmittedOnTimeUpRef.current = true;
+            submitExamRef.current?.(true);
+          }
+
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (examTimerRef.current) {
+        clearInterval(examTimerRef.current);
+        examTimerRef.current = null;
+      }
+    };
+  }, [started, finished, timeLeft]);
+
+  const formatTime = (totalSeconds) => {
+    if (totalSeconds === null || totalSeconds === undefined) return "--:--";
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
   if (!exam) return <div style={{color: 'white', textAlign: 'center', marginTop: '20%'}}>Loading Exam...</div>;
 
   return (
@@ -338,7 +398,8 @@ export default function ExamView() {
           <div style={{ flex: 1 }}>
             <h1>{exam.title}</h1>
             <p style={{ color: "#ff4d4d", fontWeight: "bold" }}>Violations: {violations}/{MAX_VIOLATIONS}</p>
-            {exam.questions.map((q, idx) => (
+            <p style={timerStyle}>Time Left: {formatTime(timeLeft)}</p>
+            {(exam?.questions?.map((q, idx) => (
               <div key={q._id} style={questionCardStyle}>
                 <div><strong>Q{idx + 1}:</strong> {q.questionText}</div>
                 {q.options.map((opt) => (
@@ -347,7 +408,7 @@ export default function ExamView() {
                   </label>
                 ))}
               </div>
-            ))}
+            )) || [])}
             <button style={{ ...btnStyle, backgroundColor: "#28a745" }} onClick={() => submitExam(false)}>Submit</button>
           </div>
 
@@ -372,6 +433,7 @@ const btnStyle = { padding: "14px 28px", cursor: "pointer", backgroundColor: "#0
 const questionCardStyle = { padding: "20px", borderRadius: "10px", marginBottom: "20px", border: "1px solid #333", backgroundColor: "#1e1e1e" };
 const webcamContainerStyle = { position: "sticky", top: "20px", border: "2px solid #444", borderRadius: "15px", padding: "10px", backgroundColor: "#000" };
 const warningToastStyle = { position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", backgroundColor: "#ffc107", color: "#000", padding: "15px 30px", borderRadius: "50px", fontWeight: "bold", zIndex: 2147483647 };
+const timerStyle = { color: "#00e676", fontWeight: "bold", fontSize: "18px", marginBottom: "20px" };
 
 
 
